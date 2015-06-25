@@ -1,0 +1,237 @@
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - STL</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #00000;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#info {
+				color: #fff;
+				position: absolute;
+				top: 10px;
+				width: 100%;
+				text-align: center;
+				z-index: 100;
+				display:block;
+
+			}
+
+			a { color: skyblue }
+			.button { background:#999; color:#eee; padding:0.2em 0.5em; cursor:pointer }
+			.highlight { background:g; color:#fff; }
+
+			span {
+				display: inline-block;
+				width: 60px;
+				float: left;
+				text-align: center;
+			}
+
+		</style>
+	</head>
+	<body>
+		<div id="info">
+			<a href="https://http://www.ucc.ie/en/biodesign" target="_blank">Biomedical Design UCC</a> -
+			Lung segmentation (Pietro Nardelli) <a href="https://github.com/pietronardelli"> PietroNardelli</a>. Rendered with <a href="http://threejs.org/">www.threejs</a>
+		</div>
+		<div id="3d">
+		<script src="js/three/three.min.js"></script>
+		<script src="js/three/STLLoader.js"></script>
+		<script src="js/three/Detector.js"></script>
+		<script src="js/three/stats.min.js"></script>
+		<script src="js/three/OrbitControls.js"></script> 
+		<!-- <script src="js/MouseControls.js"></script>  useless for the moment--> 
+		<script src="js/three/Vector3.js"></script>  
+		
+
+		<script>
+
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+
+			var container, stats;
+			var projector, mouse = { x: 0, y: 0, z: 0 };
+
+			var camera, cameraTarget, scene, renderer;
+			var controls;
+			var clock = new THREE.Clock();
+			
+			 
+
+			init();
+			animate();
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 100, window.innerWidth / window.innerHeight, 1, 1000 );
+				camera.position.set( 0, 1, -7 ); // position of the camera ( rouge, vert, bleu)
+				//=(droite, haut, gauche)
+
+				cameraTarget = new THREE.Vector3( 0, -0.25, 0 );
+
+				scene = new THREE.Scene();
+				scene.fog = new THREE.Fog( 0x72645b, 2, 15 ); //0x ... change shadow color
+
+				controls = new THREE.OrbitControls( camera );
+				// controls.damping = 0.2;
+				controls.addEventListener( 'change', render );
+				
+				// Ground
+
+				/*var plane = new THREE.Mesh(
+					new THREE.PlaneBufferGeometry( 4000, 4000 ), //size of the plane
+					new THREE.MeshPhongMaterial( { color: 0x999999, specular: 0x101010 } )
+				);
+				plane.rotation.x = -Math.PI/2;  // vertical or horizontale
+				plane.position.y = -2;  // distance between the object and the ground
+				scene.add( plane );
+
+				plane.receiveShadow = true;*/
+
+				var loader = new THREE.STLLoader();
+				var material = new THREE.MeshPhongMaterial( { color: 0xFFFFFF, specular: 0x111111, shininess: 200 } );
+			
+
+				// our file there:
+				loader.load( 'models/PigLung.stl', function ( geometry ) {
+					//smaller cause we have rezise it with the software meshlab
+					var mesh = new THREE.Mesh( geometry, material );
+
+					mesh.position.set(0, 9, 0); // position of the object
+					//mesh.rotation.set( 0 ,-Math.PI / 2 ,-Math.PI / 2 );
+					mesh.rotation.y += Math.PI;
+					mesh.rotation.x += Math.PI/2;
+					
+					mesh.scale.set( 0.045, 0.045, 0.045 ); //size of the object
+
+					mesh.castShadow = true;
+					mesh.receiveShadow = true;
+
+					scene.add( mesh );
+					
+					/*to leave after test*/
+					/*var axisHelper = new THREE.AxisHelper(5); //set axis
+					scene.add(axisHelper);*/
+					//x=red
+					//y=green
+					//z=blue
+
+				} );
+
+				// Lights
+
+				scene.add( new THREE.AmbientLight( 0x777777 ) );
+
+				addShadowedLight( 1, 1, 1, 0xffffff, 1.35 );
+				addShadowedLight( 0.5, 1, -1, 0xffaa00, 1 );
+
+				// renderer
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setClearColor( scene.fog.color );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+				renderer.gammaInput = true;
+				renderer.gammaOutput = true;
+
+				renderer.shadowMapEnabled = true;
+				renderer.shadowMapCullFace = THREE.CullFaceBack;
+
+				container.appendChild( renderer.domElement );
+
+				// stats
+
+				stats = new Stats();
+				stats.domElement.style.position = 'absolute';
+				stats.domElement.style.top = '0px';
+				stats.domElement.style.zIndex = 100;
+				container.appendChild( stats.domElement );
+
+				//
+
+				window.addEventListener( 'resize', onWindowResize, false );
+
+			}
+
+			function addShadowedLight( x, y, z, color, intensity ) {
+
+				var directionalLight = new THREE.DirectionalLight( color, intensity );
+				directionalLight.position.set( x, y, z )
+				scene.add( directionalLight );
+
+				directionalLight.castShadow = true;
+				// directionalLight.shadowCameraVisible = true;
+				
+				// shadow of the object
+				var d = 1;
+				directionalLight.shadowCameraLeft = -d;
+				directionalLight.shadowCameraRight = d;
+				directionalLight.shadowCameraTop = d;
+				directionalLight.shadowCameraBottom = -d;
+
+				directionalLight.shadowCameraNear = 1;
+				directionalLight.shadowCameraFar = 4;
+
+				directionalLight.shadowMapWidth = 1024;
+				directionalLight.shadowMapHeight = 1024;
+
+				directionalLight.shadowBias = -0.005;
+				directionalLight.shadowDarkness = 0.15;
+
+			}
+
+			function onWindowResize() {
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				render();
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+				stats.update();
+				
+
+			}
+			
+
+			function render() {
+
+				/*var timer = Date.now() * 0.00009;  // speed of rotation (0.005 fast, 0.000005 very slow
+
+				camera.position.x = Math.cos( timer ) * 10 ; //10=> bring clother or away
+				camera.position.z = Math.sin( timer ) * 10;*/
+			
+
+				camera.lookAt( cameraTarget );
+
+				renderer.render( scene, camera );
+
+			}
+			
+			
+			// CONTROLS
+			controls = new THREE.OrbitControls( camera, renderer.domElement );
+			//controls.addEventListener( 'change', render ); //useless?
+
+				
+		</script>
+		</div>
+	</body>
+</html>
